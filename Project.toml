@@ -1,0 +1,11 @@
+name = "Web3"
+uuid = "e3cba53e-28fe-11e9-33dd-c9a7e1135e74"
+authors = ["Bill Burdick <bill.burdick@gmail.com>"]
+version = "0.1.0"
+
+[compat]
+julia = "1.0"
+
+[deps]
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
