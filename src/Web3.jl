@@ -128,11 +128,10 @@ const utils = (
     sha3 = hash,
     keccak = hash)
 
+# This is a separate function so that test code can override it
 function hash(con::Web3Connection, str::String)
     hex2bytes(jsonget(con.url, :web3_sha3, ("0x" * bytes2hex(Vector{UInt8}(str))))[3:end])
 end
-
-hash(hashes::Dict, str::String) = hashes[str]
 
 """
     resultbytes

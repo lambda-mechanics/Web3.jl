@@ -2,6 +2,8 @@ using Test, Web3
 
 abi = """[{"constant":false,"inputs":[{"name":"i","type":"int32"}],"name":"add","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]"""
 
+Web3.hash(hashes::Dict, str::String) = hashes[str]
+
 hashes = Dict([
     "add(int32)" => hex2bytes("57b8a50f")
 ])

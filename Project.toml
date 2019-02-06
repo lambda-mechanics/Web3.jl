@@ -1,7 +1,7 @@
 name = "Web3"
-uuid = "e3cba53e-28fe-11e9-33dd-c9a7e1135e74"
+uuid = "0881af41-a624-557c-96ff-9a730c8d7287"
 authors = ["Bill Burdick <bill.burdick@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [compat]
 julia = "1.0"
