@@ -1,6 +1,6 @@
 # Web3.jl
 
-A module for Ethereum connectivity.
+A module for Ethereum connectivity, similar to web3.js.
 
 Parse ABI files, encode/decode ABI data, and make Ethereum [JSON-RPC](https://github.com/ethereum/wiki/wiki/JSON-RPC) calls.
 
