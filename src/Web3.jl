@@ -1,3 +1,10 @@
+"""
+    Web3
+
+A module for Ethereum connectivity.
+
+Parse ABI files, encode/decode ABI data, and make JSON-RPC calls.
+"""
 module Web3
 
 #=
@@ -43,11 +50,11 @@ topics are 32-bytes; dynamic values are represented as a hash and lose informati
 
 using HTTP, JSON, Core
 
-export readABI, Web3Connection, ABIContext
+export readABI, Web3Connection, Contract, contracts
 export FunctionCall, encodefunctioncall, decodefunctioncall
 export FunctionResult, encodefunctionresult, decodefunctionresult
 export Event, encodeevent, decodeevent
-export clientversion, utils, eth
+export clientversion, eth, utils
 
 ####################
 # Web3
@@ -109,11 +116,11 @@ end
 
 Create a call to an API func, given a function that converts inputs to JSON-ready inputs
 """
-apifunc(apimethod, func) = (con::Web3Connection, args...)-> jsonget(con.url, apimethod, func(args...))
+apifunc(apimethod, func) = (con::Web3Connection, args...; raw=false)-> (raw ? rawjsonget : jsonget)(con.url, apimethod, func(args...)...)
 
 function hash end
 
-const clientversion = apifunc(:web3_clientVersion, ())
+const clientversion = apifunc(:web3_clientVersion, ()->[])
 const eth = (
     gettransactioncount = apifunc(:eth_getTransactionCount, (addr, ctx)-> (addr, ctx)),
     gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash)))
@@ -215,6 +222,7 @@ const FunctionABI = Union{ABIType{:function}, ABIType{:constructor}, ABIType{:fa
 # VARS
 ##############
 
+"A dictionary of contract-address => Contract structures"
 contracts = Dict()
 
 fixedarraypattern = r".*\[([^\]]+)\]"
@@ -233,14 +241,14 @@ function encodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
     basicencodefunctioncall(io, f, inputs)
 end
 
-function basicencodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
-    write(io, f.hash)
-    encode(io, f.inputs, inputs)
-end
-
 function encodefunctioncall(io::IOBuffer, f::ABIFunction, inputs::Array)
     basicencodefunctioncall(io, f, inputs)
     io.data
+end
+
+function basicencodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
+    write(io, f.hash)
+    encode(io, f.inputs, inputs)
 end
 
 """
@@ -249,6 +257,15 @@ end
 Encode the results of a function
 """
 function encodefunctionresult(io::IO, f::ABIFunction, outputs::Array)
+    basicencodefunctionresult(io, f, outputs)
+end
+
+function encodefunctionresult(io::IOBuffer, f::ABIFunction, outputs::Array)
+    basicencodefunctionresult(io, f, outputs)
+    io.data
+end
+
+function basicencodefunctionresult(io::IO, f::ABIFunction, outputs::Array)
     write(io, f.hash)
     encode(io, f.outputs, outputs)
 end
@@ -259,6 +276,15 @@ end
 Encode an event
 """
 function encodeevent(io::IO, e::ABIEvent, inputs::Array)
+    basicencodeevent(io, e, inputs)
+end
+
+function encodeevent(io::IOBuffer, e::ABIEvent, inputs::Array)
+    basicencodeevent(io, e, inputs)
+    io.data
+end
+
+function basicencodeevent(io::IO, e::ABIEvent, inputs::Array)
     write(io, e.hash)
     encode(io, e.inputs, inputs)
 end
@@ -344,33 +370,33 @@ end
 readlength(io::IO) = (read(io, UInt128);read(io, UInt128))
 
 """
-    decodefunctioncall(io::IO, con::ABIContext)
+    decodefunctioncall(io::IO, con::Contract)
 
 Decode a function call
 """
-function decodefunctioncall(io::IO, con::ABIContext)
-    decl = con.contract.functions[read(io, 4)]
+function decodefunctioncall(io::IO, con::Contract)
+    decl = con.functions[read(io, 4)]
     FunctionCall(decl, decode(io, decl.inputs))
 end
 
 """
-    decodefunctionresult(io::IO, con::ABIContext)
+    decodefunctionresult(io::IO, con::Contract)
 
 Decode a function call result
 """
-function decodefunctionresult(io::IO, con::ABIContext)
+function decodefunctionresult(io::IO, con::Contract)
     hash = read(io, 4)
-    f = con.contract.functions[hash]
+    f = con.functions[hash]
     FunctionResult(f, decode(io, f.outputs))
 end
 
 """
-    decodeevent(io::IO, con::ABIContext)
+    decodeevent(io::IO, con::Contract)
 
 Decode an event in a transaction log
 """
-function decodeevent(io::IO, con::ABIContext)
-    decl = con.contract.events[read(io, 4)]
+function decodeevent(io::IO, con::Contract)
+    decl = con.events[read(io, 4)]
     Event(decl, decode(io, decl.inputs))
 end
 

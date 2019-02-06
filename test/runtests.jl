@@ -29,6 +29,6 @@ txn = Dict{String,Any}(
 @test readABI(hashes, contract, IOBuffer(abi)) != nothing
 
 # test basic function call
-decoded = decodefunctioncall(IOBuffer(hex2bytes(txn["input"][3:end])), ABIContext(Web3.contracts[txn["to"]], hashes))
+decoded = decodefunctioncall(IOBuffer(hex2bytes(txn["input"][3:end])), contracts[txn["to"]])
 data = encodefunctioncall(IOBuffer(UInt8[], write=true), decoded.decl, decoded.inputs)
 @test txn["input"] == "0x" * bytes2hex(data)
