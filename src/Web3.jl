@@ -142,8 +142,7 @@ const eth = (
                                     :value => value
                                     :data => data
                                     :nonce => nonce])))
-const utils = (
-    keccak = hash)
+const utils = (keccak = hash,)
 
 # This is a separate function so that test code can override it
 function hash(con::Web3Connection, str::String)
@@ -647,7 +646,7 @@ end
 options are: gasprice, gas, value, nonce, chain, hardfork, common
 """
 function send(context::ContractContext, name, from, args, options...)
-    println("Call $name in contract $(contract(context).id)")
+    println("Call $name in contract $(contract(context).id)\nfrom account $(from)")
     transaction = merge!(Dict([
         :to => contract(context).id
         :from => from
