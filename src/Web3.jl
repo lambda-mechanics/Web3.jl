@@ -55,6 +55,11 @@ export FunctionCall, encodefunctioncall, decodefunctioncall
 export FunctionResult, encodefunctionresult, decodefunctionresult
 export Event, encodeevent, decodeevent
 export clientversion, eth, utils
+export computetypes, ContractContext, contract, connection, functions
+export sha3_224, sha3_256, sha3_384, sha3_512
+export keccac224, keccac256, keccac384, keccac512
+
+include("keccak.jl")
 
 ####################
 # Web3
@@ -81,7 +86,12 @@ end
 
 Call a JSON-RPC method and return the result property of the JSON result
 """
-jsonget(url, method, params...) = rawjsonget(url, method, params...)["result"]
+#jsonget(url, method, params...) = rawjsonget(url, method, params...)["result"]
+function jsonget(url, method, params...)
+    rawjsonget(url, method, params...)
+    println("JSON: ", repr(json))
+    json["result"]
+end
 
 """
     rawjsonget(url, method, params...)
@@ -123,14 +133,22 @@ function hash end
 const clientversion = apifunc(:web3_clientVersion, ()->[])
 const eth = (
     gettransactioncount = apifunc(:eth_getTransactionCount, (addr, ctx)-> (addr, ctx)),
-    gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash)))
+    gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash)),
+    sendtransaction = apifunc(:eth_sendTransaction, (from, to, gas, gasprice, value, data, nonce)->
+                              Dict([:from => from
+                                    :to => to
+                                    :gas => gas
+                                    :gasprice => gasprice
+                                    :value => value
+                                    :data => data
+                                    :nonce => nonce])))
 const utils = (
-    sha3 = hash,
     keccak = hash)
 
 # This is a separate function so that test code can override it
 function hash(con::Web3Connection, str::String)
-    hex2bytes(jsonget(con.url, :web3_sha3, ("0x" * bytes2hex(Vector{UInt8}(str))))[3:end])
+#    hex2bytes(jsonget(con.url, :web3_sha3, ("0x" * bytes2hex(Vector{UInt8}(str))))[3:end])
+    keccak256(collect(UInt8, str))
 end
 
 """
@@ -143,11 +161,6 @@ resultbytes(func) = (args...)-> hex2bytes(func(args...)[3:end])
 ####################
 # ABI
 ####################
-
-struct ABIContext
-    contract
-    connection
-end
 
 struct Int256
     big::Int128
@@ -176,13 +189,14 @@ end
 
 struct ABIFunction
     constant
-    hash
+    hash # first 4 bytes of keccak hash
     inputs::Array{Decl}
     name
     outputs
     payable
     signature
     statemutability
+    argtypes
 end
 
 struct ABIEvent
@@ -208,24 +222,32 @@ struct Event
     parameters::Array
 end
 
-struct Contract
+struct Contract{Name}
+    id::String
     functions
     events
-    Contract() = new(Dict(), Dict())
+    function Contract(id::String)
+        id = cleanaddress(id)
+        new{Symbol(id)}(id, Dict{Union{String, Vector{UInt8}}, ABIFunction}(), Dict())
+    end
+end
+
+function cleanaddress(str::String)
+    if match(r"^0[xX]", str) != nothing
+        str = str[3:end]
+    end
+    @assert match(r"[0-9a-fA-F]{20}", str) != nothing
+    str
 end
 
 const NumDecl = Union{Decl{T, :int} where T, Decl{T, :uint} where T}
 const FunctionABI = Union{ABIType{:function}, ABIType{:constructor}, ABIType{:fallback}};
 
-##############
-# VARS
-##############
-
 "A dictionary of contract-address => Contract structures"
-contracts = Dict()
+const contracts = Dict()
 
-fixedarraypattern = r".*\[([^\]]+)\]"
-bitspattern = r"^([^[0-9]+)([0-9]*)"
+const fixedarraypattern = r".*\[([^\]]+)\]"
+const bitspattern = r"^([^[0-9]+)([0-9]*)"
 
 ##############
 # ENCODING
@@ -353,8 +375,8 @@ end
 # DECODING
 ############
 
-signedTypes = Dict([t.size => t for t in (Int8, Int16, Int32, Int64, Int128)])
-unsignedTypes = Dict([t.size => t for t in (UInt8, UInt16, UInt32, UInt64, UInt128)])
+const signedTypes = Dict([t.size => t for t in (Int8, Int16, Int32, Int64, Int128)])
+const unsignedTypes = Dict([t.size => t for t in (UInt8, UInt16, UInt32, UInt64, UInt128)])
 
 function readint(io::IO)
     big = read(io, Int128)
@@ -424,7 +446,7 @@ function decode(io::IO, ::Decl{T, :bool}) where T
     little = read(io, UInt128)
     litle == 0 ? false : true
 end
-    
+
 # dynamic types
 decodehead(io::IO, decl::Decl{:dynamic, :bytes}) = readlength(io)
 decodetail(io::IO, decl::Decl{:dynamic, :bytes}, head) = readbytes(io, head)
@@ -460,29 +482,66 @@ decodetail(io::IO, decls::Array, heads) = [decodetail(io, decls[i], heads[i]) fo
 # DECL PARSING
 ####################
 
-parseABI(con::ABIContext, json) = parseABI(con, ABIType(Symbol(get(json, "type", "function"))), json)
+rows(array) = [array[row, :] for row in 1:size(a)[1]]
 
-function parseABI(con::ABIContext, ::FunctionABI, func)
+# Make conversion mapping given specs:
+#   (Solidity-prefix, Julia type, byte length)
+conversions(rows) = vcat([["$stype$(bytes * 8)" => jtype for bytes in rng] for (stype, jtype, rng) in rows]...)
+
+const soliditytojulia = Dict(conversions([
+    # Solidity-prefix, Julia type, bytes
+    ("int", Int8, [8])
+    ("uint", UInt8, [8])
+    ("int", Int16, [16])
+    ("uint", UInt16, [16])
+    ("int", Int32, 3:4)
+    ("uint", UInt32, 3:4)
+    ("int", Int64, 5:8)
+    ("uint", UInt64, 5:8)
+    ("int", Int128, 9:16)
+    ("uint", UInt128, 9:16)
+    ("int", BigInt, 17:32)
+    ("uint", BigInt, 17:32)
+]))
+
+parseABI(connection::Web3Connection, json) = parseABI(connection, ABIType(Symbol(get(json, "type", "function"))), json)
+function parseABI(connection::Web3Connection, ::FunctionABI, func)
     name = func["name"]
     args = join((arg-> arg["type"]).(func["inputs"]), ",")
     sig = "$name($args)"
+    inputs = parseargs(func["inputs"])
     ABIFunction(
         func["constant"],
-        utils.sha3(con.connection, sig)[1:4],
-        parseargs(func["inputs"]),
+        utils.keccak(connection, sig)[1:4],
+        inputs,
         name,
         haskey(func, "outputs") ? parseargs(func["outputs"]) : [],
         func["payable"],
         sig,
-        func["stateMutability"]
+        func["stateMutability"],
+        computetypes(name, inputs)
     )
 end
 
-function parseABI(con::ABIContext, ::ABIType{:event}, evt)
+function parseABI(connection::Web3Connection, ::ABIType{:event}, evt)
     name = evt["name"]
     args = join((arg-> arg["type"]).(evt["inputs"]), ",")
     sig = "$name($args)"
-    ABIEvent(evt["name"], utils.sha3(con.connection, sig)[1:4], sig, get(evt, "anonymous", false), parseargs(evt["inputs"]))
+    ABIEvent(evt["name"], utils.keccak(connection, sig)[1:4], sig, get(evt, "anonymous", false), parseargs(evt["inputs"]))
+end
+
+computetype(decl::Decl{T, :int, SIZE}) where {T, SIZE} = soliditytojulia["int$SIZE"]
+computetype(decl::Decl{T, :uint, SIZE}) where {T, SIZE} = soliditytojulia["uint$SIZE"]
+computetype(decl::Decl{:tuple, SIZE}) where {T, SIZE} = "tuple[$SIZE]"
+computetype(decl::Decl{:array, BASE, BITS, LENGTH}) where {BASE, BITS, LENGTH} = "array[LENGTH] of $BASE"
+computetype(decl::Decl{T, :bool} where {T}) = Bool
+computetype(decl::Decl{:string}) = String
+computetype(decl::Decl{:bytes}) = Vector{UInt8}
+computetype(decl::Decl{:dynamic, TYPE}) where TYPE = "array of $TYPE"
+
+computetypes(func::ABIFunction) = computetypes(func.name, func.inputs)
+function computetypes(name, decls::Array{T} where T <: Decl)
+    computetype.(decls)
 end
 
 """
@@ -490,22 +549,21 @@ end
 
 Read an ABI file for a contract
 """
-function readABI(con::Union{Web3Connection, Dict}, contractname::String, stream::IO)
-    contract = Contract()
-    context = ABIContext(contract, con)
+function readABI(connection::Web3Connection, contractname::String, stream::IO)
+    contract = Contract(contractname)
     d = JSON.parse(stream)
     close(stream)
-    for json in d
-        obj = parseABI(context, json)
+    for json in (haskey(d, "abi") ? d["abi"] : d)
+        obj = parseABI(connection, json)
         if isa(obj, ABIFunction)
             contract.functions[obj.name] = contract.functions[obj.hash] = obj
             if verbose
-                println("$(bytes2hex(obj.hash)) $(obj.signature) $(repr(obj)) $(bytes2hex(utils.sha3(con, obj.signature)))")
+                println("$(bytes2hex(obj.hash)) $(obj.signature) $(repr(obj)) $(bytes2hex(utils.keccak(connection, obj.signature)))")
             end
         elseif isa(obj, ABIEvent)
             contract.events[obj.name] = contract.events[obj.hash] = obj
             if verbose
-                println("$(bytes2hex(obj.hash)) $(obj.signature) $(repr(obj)) $(bytes2hex(utils.sha3(con, obj.signature)))")
+                println("$(bytes2hex(obj.hash)) $(obj.signature) $(repr(obj)) $(bytes2hex(utils.keccak(connection, obj.signature)))")
             end
         elseif verbose
             println(repr(obj))
@@ -554,9 +612,69 @@ parseargs(args) = parsearg.(args)
 
 global verbose = false
 
+struct ContractContext{contractid}
+    connection
+    contract
+end
+
+connection(con::ContractContext) = getfield(con, :connection)
+
+contract(con::ContractContext) = getfield(con, :contract)
+
+functions(con::ContractContext) = contract(con).functions
+
+struct Val{Name} end
+
+function gen(contract, con)
+    funcs = collect(filter(p-> isa(p[1], String), contract.functions))
+    methods = map(funcs) do ((name, func))
+        argnames = map(a-> Symbol("a$a"), 1:length(func.argtypes))
+        args = map(((name, type)::Tuple)-> :($name::$type), zip(argnames, func.argtypes))
+        :($(Symbol(name)) = ($(args...),)-> (
+            send = (from; options...)-> send(context, $name, from, ($(argnames...),); options...),
+            call = ()-> (),
+            estimategas = ()-> (),
+            encodeabi = ()-> ()
+        ))
+    end
+    type = ContractContext{Symbol(contract.id)}
+    eval(:(Base.getproperty(context::$type, prop::Symbol) = ($(methods...),)[prop]))
+end
+
+"""
+    send(id, data; options)
+
+options are: gasprice, gas, value, nonce, chain, hardfork, common
+"""
+function send(context::ContractContext, name, from, args, options...)
+    println("Call $name in contract $(contract(context).id)")
+    transaction = merge!(Dict([
+        :to => contract(context).id
+        :from => from
+        :data=> encodearguments(args)]), pairs(options))
+    result = rawjsonget(connection(context).url, :eth_sendTransaction, transaction)
+    if haskey(result, "error")
+        err = result["error"]
+        println("ERROR: $(err["message"])\n$(err["data"]["stack"])")
+    end
+    println("JSON: $(repr(result))")
+    result
+end
+
+encodearguments(args) = :ENCODED_ARGUMENTS
+
+ContractContext(con::Web3Connection, contract::String, filename::String) = ContractContext(con, contract, open(filename))
+
+function ContractContext(con::Web3Connection, contractid::String, file::IO)
+    contract = readABI(con, contractid, file)
+    gen(contract, con)
+    ContractContext{Symbol(contract.id)}(con, contract)
+end
+
 function setverbose(v)
     global verbose
     verbose = v
 end
+
 
 end # module

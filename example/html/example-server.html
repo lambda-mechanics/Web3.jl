@@ -1,0 +1,153 @@
+<!-- Copyright (C) 2019, by Bill Burdick, ZLIB licensed, https://github.com/zot/domdom -->
+<html>
+    <head>
+        <link rel="stylesheet" href="css/domdom.css"></link>
+        <script src="https://kit.fontawesome.com/02a1a974ac.js" crossorigin="anonymous"></script>
+        <script src="js/lib/handlebars-v4.0.5.js"></script>
+        <script src="js/domdom.js"></script>
+        <style>
+         button {
+             user-select: none;
+         }
+         .start {
+             justify-self: start;
+             align-self: flex-start;
+         }
+         .end {
+             justify-self: end;
+             align-self: flex-end;
+         }
+         .2-col {
+             grid-column-end: span 2;
+         }
+         .grid-2-col {
+             position: relative;
+             display: grid;
+             grid: none / auto auto;
+             justify-content: start;
+             grid-gap: 0.5ex;
+         }
+         .edit {
+             padding: 1ex;
+             padding-top: 1em;
+             margin-top: 1ex;
+             margin-left: 1ex;
+             border: black solid 2px;
+             border-radius: 5px;
+         }
+         .flex-column {
+             display: flex;
+             flex-direction: column;
+         }
+         .align-start {
+             align-items: start;
+         }
+         .stretch {
+             align-items: stretch;
+         }
+         .input-height {
+             min-height: calc(1em + 6px);
+         }
+         .killbutton:focus {
+             outline: none;
+         }
+         .killbutton {
+             position: absolute;
+             top: 2px;
+             right: 2px;
+             padding: 0;
+             border: none;
+             /*background: none;*/
+         }
+         .dialog-wrapper {
+             position: absolute;
+             top: 0;
+             left: 0;
+             height: 100%;
+             width: 100%;
+             display: flex;
+             justify-content: space-around;
+             align-items: start;
+             flex-direction: row;
+         }
+         .dialog-frame {
+             background: lightgray;
+             border: darkgray 4px solid;
+             border-radius: 5px;
+             padding: 5px;
+             margin-top: 2em;
+         }
+        </style>
+    </head>
+    <body>
+        <div style='margin: auto; max-width: 1248px; background: lightcyan; min-height: 800px'>
+            <div id='top'></div>
+        </div>
+        <!-- STANDARD VIEWDEFS -->
+        <div data-viewdef='html'>{{{content}}}</div>
+        <div data-viewdef='view' data-path='contents' data-namespace='{{namespace}}' data-replace='true'></div>
+        <div data-viewdef='ref'>{{{ref path namespace}}}</div>
+        <div data-viewdef='message' class='dialog-wrapper'>
+            <div class='dialog-frame flex-column'>
+                <div>{{{content}}}</div>
+                <button data-path='ok'>OK</button>
+            </div>
+        </div>
+        <!-- APP VIEWDEFS -->
+        <div data-viewdef='header'>
+            <div style='display: flex; justify-content: space-between'>
+                <span>
+                    <button data-path='home'>Home</button>
+                    <a href='javascript:void(document.location = document.location)'>Refresh</a>
+                </span>
+                <b>{{heading}} {{#if login}}Logged in as {{login}}{{/if}}</b>
+                <div>
+                    <button data-path='accounts'>Accounts</button>
+                    {{#if login}}
+                    <button data-path='edit'>Edit</button>
+                    <button data-path='logout'>Sign out</button>
+                    {{else}}
+                    <button data-path='edit' disabled>Edit</button>
+                    <button data-path='login'>Login</button>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+        <div data-viewdef='login' class='grid-2-col'>
+            Login:<input type='text' data-path='username' style='width: 32ex'>
+            Password:<input type='password' data-path='password' style='width: 32ex'>
+            <button data-path='ok' class='start'>OK</button><button data-path='cancel' class='end'>Cancel</button>
+            <script>Domdom.takeFocusForScript("input[data-path=username]")</script>
+        </div>
+        <div data-viewdef='accounts' class='flex-column align-start'>
+            <H2>Accounts</H2>
+            <button data-path='newaccount'>New Account</button><br>
+            <div class='flex-column' data-path='accounts' data-replace='true'></div>
+        </div>
+        <div data-viewdef='account' class='grid-2-col' style='margin-top: 1ex; margin-left: 1ex; border: black solid 2px; border-radius: 5px; padding: 1ex'>
+            <span class='input-height'>User ID:</span>{{acctId}}
+            <span class='input-height'>Name:</span>{{username}}
+            <span class='input-height'>Password:</span>{{password}}
+            <button data-path='edit' class='start'>Edit</button>
+        </div>
+        <div data-viewdef='account/edit' class='grid-2-col edit'>
+            <span class='input-height'>User ID:</span>{{acctId}}
+            <span class='input-height'>User Name:</span><input data-path='username'>
+            <span class='input-height'>Password:</span><input data-path='password'>
+            <button data-path='save' class='start'>Save</button>
+            <button data-path='cancel' class='end'>Cancel</button>
+            <button data-path='delete' class='killbutton'><i class="fas fa-window-close"></i></button>
+            <script>Domdom.takeFocusForScript("input[data-path=username]")</script>
+        </div>
+        <div data-viewdef='newaccount' class='dialog-wrapper'>
+            <div class='dialog-frame'>
+                <center><b>New Account</b></center>
+                <div data-path='account' data-namespace='edit'></div>
+            </div>
+        </div>
+        <script>
+         Domdom.setVerbose(true);
+         Domdom.connect({}, "ws://"+new URL("..", location).host);
+        </script>
+    </body>
+</html>
