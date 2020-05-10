@@ -1,5 +1,7 @@
 using Web3
 
+setverbose(true)
+
 dir = dirname(dirname(dirname(@__FILE__)))
 
 contractid = "0x4ED124fcf412C28E4f36790a3A88056a5c44ade2"
@@ -31,12 +33,8 @@ println("Transactions: " * eth.gettransactioncount(connection, "0x4083eFF85F0C6a
 
 #println(context.numAccounts().send)
 
-setverbose(true)
-
-#println(bytes2hex(context.numAccounts().encodeabi()))
-#println(context.numAccounts.call(from = "0x4083eFF85F0C6a740c440E3419EbE6f7E1713447"))
-println(context.numAccounts.call())
-
-#context.updateAccount
+println("num accounts: ", context.numAccounts.call())
+#context.updateAccount.send(true, "d", "e", "f", from = "0x579CDD2D6404f033E70336BDE7a30CDf5c2c574c", gas = 200000)
+println("Account info for bubba: ", context.getAccount.call("d"))
 
 println("done")

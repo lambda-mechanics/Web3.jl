@@ -303,42 +303,68 @@ function basicencodeevent(io::IO, e::ABIEvent, inputs::Array)
 end
 
 function encode(io::IO, decl::Union{Decl, Array}, value)
-    encodehead(io, decl, value)
+    encodehead(io, decl, value, length(value) * 32)
     encodetail(io, decl, value)
 end
+
+encint(io, i::Signed) = encints(Int128(i < 0 ? -1 : 0), Int128(i))
+encint(io, i::Unsigned) = encints(io, UInt128(0), UInt128(i))
+encint(io, i::Union{Int256, UInt256}) = encints(i.big, i.little)
+encints(io, ints...) = vcat(hton.(ints)...)
 
 # utilities
 writeint(io, i::Signed) = writeints(io, Int128(i < 0 ? -1 : 0), Int128(i))
 writeint(io, i::Unsigned) = writeints(io, UInt128(0), UInt128(i))
 writeint(io, i::Union{Int256, UInt256}) = writeints(io, i.big, i.little)
 writeints(io, ints...) = write(io, hton.(ints)...)
-encodescalar(io::IO, decl::Decl{Any, :bool}, value) = writeint(io, value ? 1 : 0)
+encodescalar(io::IO, decl::Decl{:scalar, :bool}, value) = writeint(io, value ? 1 : 0)
 encodescalar(io::IO, decl::NumDecl, value) = writeint(io, value)
 
 # scalar types
-encodehead(io, decl::Decl{:scalar}, v) = encodescalar(io, decl, v)
+function encodehead(io::IO, decl::Decl{:scalar}, v, offset::Int)
+    encodescalar(io, decl, v)
+    offset
+end
 encodetail(io, ::Decl{:scalar}, v) = nothing
 
 # dynamic types
-encodehead(io, ::Union{Decl{:string}, Decl{:bytes}, Decl{:dynamic}}, v) = writeuint(io, length(v))
-encodetail(io, ::Union{Decl{:string}, Decl{:bytes}}, v) = write(io, v)
+function encodehead(io::IO, ::Union{Decl{:string}, Decl{:bytes}}, v, offset::Int)::Int
+    writeint(io, offset)
+    offset + ceil(length(IOBuffer(v).data) / 32) * 32 + 32
+end
+function encodetail(io, ::Union{Decl{:string}, Decl{:bytes}}, v)
+    buf = IOBuffer(v)
+    len = bytesavailable(buf)
+    writeint(io, len)
+    write(io, v)
+    pad = 32 - len % 32
+    if pad != 32
+        for i = 1 : pad
+            write(io, Int8(0))
+        end
+    end
+end
+function encodehead(io::IO, ::Decl{:dynamic}, v, offset::Int)
+    writeint(io, offset)
+    offset + length(v) * 64
+end
 function encodetail(io::IO, decl::Decl{:dynamic}, values)
     for v in values
         encodescalar(decl, v)
     end
 end
 
-# array
-function encodehead(io::IO, decl::Decl{:array, BASE, BITS, LENGTH}, values) where {BASE, BITS, LENGTH}
-    t = arraycomptype(decl)
-    for i in 1:LENGTH
-        encodehead(io, t, values[i])
-    end
+# fixed-size array
+function encodehead(io::IO, decl::Decl{:array, BASE, BITS, LENGTH}, values, offset::Int) where {BASE, BITS, LENGTH}
+    writeint(io, offset)
+    offset + LENGTH * 64
 end
-function encodetail(io::IO, decl::Decl{:array}, values)
+function encodetail(io::IO, decl::Decl{:array, BASE, BITS, LENGTH}, values) where {BASE, BITS, LENGTH}
     t = arraycomptype(decl)
+    writeint(length)
+    offset = 0
     for i in 1:LENGTH
-        encodetail(io, t, values[i])
+        offset = encodehead(io, t, values[i], offset)
     end
 end
 function arraycomptype(decl::Decl{:array, BASE, BITS, LENGTH}) where {BASE, BITS, LENGTH}
@@ -350,14 +376,15 @@ function arraycomptype(decl::Decl{:array, BASE, BITS, LENGTH}) where {BASE, BITS
 end
 
 # tuple
-encodehead(io::IO, decl::Decl{:tuple}, values) = encodehead(io, decl.components, values)
+encodehead(io::IO, decl::Decl{:tuple}, values, offset) = encodehead(io, decl.components, values, offset)
 encodetail(io::IO, decl::Decl{:tuple}, values) = encodetail(io, decl.components, values)
-function encodehead(io::IO, decls::Array, values)
+function encodehead(io::IO, decls::Array{Decl}, values, offset::Int)
     for i in 1:length(decls)
-        encodehead(io, decls[i], values[i])
+        offset = encodehead(io, decls[i], values[i], offset)
     end
+    offset
 end
-function encodetail(io::IO, decls::Array, values)
+function encodetail(io::IO, decls::Array{Decl}, values)
     for i in 1:length(decls)
         encodetail(io, decls[i], values[i])
     end
@@ -623,7 +650,7 @@ function gen(contract, con)
     methods = map(funcs) do ((name, func))
         argnames = map(a-> Symbol("a$a"), 1:length(func.argtypes))
         args = map(((name, type)::Tuple)-> :($name::$type), zip(argnames, func.argtypes))
-        :($(Symbol(name)) = (
+        method = :($(Symbol(name)) = (
             send = ($(args...),; options...)-> send(context, $name, [$(argnames...)]; options...),
             call = ($(args...),; options...)-> call(context, $name, [$(argnames...)]; options...),
             estimategas = ($(args...),; options...)-> (),
@@ -633,11 +660,11 @@ function gen(contract, con)
                 take!(buf)
             end
         ))
+        if verbose println("\n$name = ", method, "\n") end
+        method
     end
     type = ContractContext{Symbol(contract.id)}
-    expr = :(Base.getproperty(context::$type, prop::Symbol) = ($(methods...),)[prop])
-    if verbose println("EXPR:", expr) end
-    eval(expr)
+    eval(:(Base.getproperty(context::$type, prop::Symbol) = ($(methods...),)[prop]))
 end
 
 """
@@ -661,7 +688,11 @@ function basicsend(op, context::ContractContext, name, args; options...)
         :id => 1
     ]),
                          pairs(options))
-    result = rawjsonget(connection(context).url, op, transaction, "latest")
+    result = if op == :eth_sendTransaction
+        rawjsonget(connection(context).url, op, transaction)
+    else
+        rawjsonget(connection(context).url, op, transaction, "latest")
+    end
     if haskey(result, "error")
         err = result["error"]
         println("ERROR: $(err["message"])\n$(err["data"]["stack"])")
