@@ -2,7 +2,7 @@ using Web3
 
 dir = dirname(dirname(dirname(@__FILE__)))
 
-contractid = "0xbC0ACbb20C03030308b2FBCAde275Ba1889C37dF"
+contractid = "0x4ED124fcf412C28E4f36790a3A88056a5c44ade2"
 
 connection = Web3Connection("http://localhost:7545")
 
@@ -25,10 +25,18 @@ println("Wrappers...")
 #    println("($(typeof(p[1]))) $(p[1]) => $(repr(first(methods(p[2]))))")
 #end
 
+println("Transactions: " * eth.gettransactioncount(connection, "0x4083eFF85F0C6a740c440E3419EbE6f7E1713447", "latest"))
+
 #println(repr(context.numAccounts))
 
 #println(context.numAccounts().send)
 
-println(context.numAccounts().send("0x4083eFF85F0C6a740c440E3419EbE6f7E1713447"))
+setverbose(true)
+
+#println(bytes2hex(context.numAccounts().encodeabi()))
+#println(context.numAccounts.call(from = "0x4083eFF85F0C6a740c440E3419EbE6f7E1713447"))
+println(context.numAccounts.call())
+
+#context.updateAccount
 
 println("done")

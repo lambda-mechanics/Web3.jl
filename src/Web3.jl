@@ -37,17 +37,6 @@ EVENT: [contract address][topics[0]: signature][topics[n]: indexed args[n - 1]][
 topics are 32-bytes; dynamic values are represented as a hash and lose information
 =#
 
-####
-#### CAVEATS
-####
-#### 1) THIS USES THE JSON API FOR KECCAK, WHICH IS HORRIBLY INEFFICIENT
-####    THIS IS ONLY DONE WHILE PARSING ABIS BUT WE SHOULD CHANGE IT TO A LOCAL CALL
-####    MAYBE LINK TO THE CORRUS VERSION: https://github.com/coruus/keccak-tiny
-####    THE PROBLEM IS THAT IT RELIES ON MEMSET_S WHICH IS NOT CURRENTLY AVAILABLE IN LINUX
-####    SURE WOULD BE NICE TO HAVE SHAKE256 IN PURE JULIA
-####    MAYBE SOMEONE WILL PORT [jsSHA](https://caligatio.github.io/jsSHA)
-####
-
 using HTTP, JSON, Core
 
 export readABI, Web3Connection, Contract, contracts
@@ -57,7 +46,8 @@ export Event, encodeevent, decodeevent
 export clientversion, eth, utils
 export computetypes, ContractContext, contract, connection, functions
 export sha3_224, sha3_256, sha3_384, sha3_512
-export keccac224, keccac256, keccac384, keccac512
+export setverbose
+#export keccac224, keccac256, keccac384, keccac512
 
 include("keccak.jl")
 
@@ -88,7 +78,7 @@ Call a JSON-RPC method and return the result property of the JSON result
 """
 #jsonget(url, method, params...) = rawjsonget(url, method, params...)["result"]
 function jsonget(url, method, params...)
-    rawjsonget(url, method, params...)
+    json = rawjsonget(url, method, params...)
     println("JSON: ", repr(json))
     json["result"]
 end
@@ -105,7 +95,7 @@ function rawjsonget(url, method, params...)
         :params => params
     ]))
     if verbose
-        println("REQUEST: $(repr(req))")
+        println("\nREQUEST: $(req)\n")
     end
     resp = HTTP.request("POST", url, [], req)
     if resp.status == 200
@@ -146,7 +136,7 @@ const utils = (keccak = hash,)
 
 # This is a separate function so that test code can override it
 function hash(con::Web3Connection, str::String)
-#    hex2bytes(jsonget(con.url, :web3_sha3, ("0x" * bytes2hex(Vector{UInt8}(str))))[3:end])
+    #hex2bytes(jsonget(con.url, :web3_sha3, ("0x" * bytes2hex(Vector{UInt8}(str))))[3:end])
     keccak256(collect(UInt8, str))
 end
 
@@ -160,6 +150,9 @@ resultbytes(func) = (args...)-> hex2bytes(func(args...)[3:end])
 ####################
 # ABI
 ####################
+
+## Int256 and UInt256 should be changed to primitive types
+## See https://github.com/rfourquet/BitIntegers2.jl/blob/master/src/BitIntegers.jl
 
 struct Int256
     big::Int128
@@ -253,17 +246,17 @@ const bitspattern = r"^([^[0-9]+)([0-9]*)"
 ##############
 
 """
+    encodefunctioncall(f::ABIFunction, inputs::Array) -> data
     encodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
+    encodefunctioncall(io::IOBuffer, f::ABIFunction, inputs::Array) -> data
 
 Encode a call to a function
 """
-function encodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
-    basicencodefunctioncall(io, f, inputs)
-end
-
+encodefunctioncall(f::ABIFunction, inputs::Array) = encodefunctioncall(IOBuffer(), f, inputs)
+encodefunctioncall(io::IO, f::ABIFunction, inputs::Array) = basicencodefunctioncall(io, f, inputs)
 function encodefunctioncall(io::IOBuffer, f::ABIFunction, inputs::Array)
     basicencodefunctioncall(io, f, inputs)
-    io.data
+    take!(io)
 end
 
 function basicencodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
@@ -626,18 +619,25 @@ struct Val{Name} end
 
 function gen(contract, con)
     funcs = collect(filter(p-> isa(p[1], String), contract.functions))
+    funcdict = Dict(map(funcs) do ((name, func)) name => func end)
     methods = map(funcs) do ((name, func))
         argnames = map(a-> Symbol("a$a"), 1:length(func.argtypes))
         args = map(((name, type)::Tuple)-> :($name::$type), zip(argnames, func.argtypes))
-        :($(Symbol(name)) = ($(args...),)-> (
-            send = (from; options...)-> send(context, $name, from, ($(argnames...),); options...),
-            call = ()-> (),
-            estimategas = ()-> (),
-            encodeabi = ()-> ()
+        :($(Symbol(name)) = (
+            send = ($(args...),; options...)-> send(context, $name, [$(argnames...)]; options...),
+            call = ($(args...),; options...)-> call(context, $name, [$(argnames...)]; options...),
+            estimategas = ($(args...),; options...)-> (),
+            encodeabi = ($(args...),; options...)-> begin
+                buf = IOBuffer()
+                encodefunctioncall(buf, contract(context).functions[$(String(name))], [$(argnames...)])
+                take!(buf)
+            end
         ))
     end
     type = ContractContext{Symbol(contract.id)}
-    eval(:(Base.getproperty(context::$type, prop::Symbol) = ($(methods...),)[prop]))
+    expr = :(Base.getproperty(context::$type, prop::Symbol) = ($(methods...),)[prop])
+    if verbose println("EXPR:", expr) end
+    eval(expr)
 end
 
 """
@@ -645,13 +645,23 @@ end
 
 options are: gasprice, gas, value, nonce, chain, hardfork, common
 """
-function send(context::ContractContext, name, from, args, options...)
-    println("Call $name in contract $(contract(context).id)\nfrom account $(from)")
+function send(context::ContractContext, name, args; options...)
+    basicsend(:eth_sendTransaction, context, name, args; options...)
+end
+
+function call(context::ContractContext, name, args; options...)
+    basicsend(:eth_call, context, name, args; options...)
+end
+
+function basicsend(op, context::ContractContext, name, args; options...)
+    #println("Call $name in contract $(contract(context).id)\nfrom account $(from)")
     transaction = merge!(Dict([
-        :to => contract(context).id
-        :from => from
-        :data=> encodearguments(args)]), pairs(options))
-    result = rawjsonget(connection(context).url, :eth_sendTransaction, transaction)
+        :to => lowercase("0x" * contract(context).id)
+        :data=> "0x" * bytes2hex(encodefunctioncall(contract(context).functions[name], args)) #encodearguments(args)
+        :id => 1
+    ]),
+                         pairs(options))
+    result = rawjsonget(connection(context).url, op, transaction, "latest")
     if haskey(result, "error")
         err = result["error"]
         println("ERROR: $(err["message"])\n$(err["data"]["stack"])")
@@ -660,7 +670,7 @@ function send(context::ContractContext, name, from, args, options...)
     result
 end
 
-encodearguments(args) = :ENCODED_ARGUMENTS
+encodearguments(args) = if args == () "" else :ENCODED_ARGUMENTS end
 
 ContractContext(con::Web3Connection, contract::String, filename::String) = ContractContext(con, contract, open(filename))
 
