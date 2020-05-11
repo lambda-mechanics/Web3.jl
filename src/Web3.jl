@@ -739,7 +739,10 @@ end
 
 encodearguments(args) = if args == () "" else :ENCODED_ARGUMENTS end
 
-ContractContext(con::Web3Connection, contract::String, filename::String) = ContractContext(con, contract, open(filename))
+function ContractContext(url::String, contractid::String, jsonabifile::String)
+    ContractContext(Web3Connection(url), contractid, jsonabifile)
+end
+ContractContext(con::Web3Connection, contractid::String, jsonabifile::String) = ContractContext(con, contractid, open(jsonabifile))
 
 function ContractContext(con::Web3Connection, contractid::String, file::IO)
     contract = readABI(con, contractid, file)

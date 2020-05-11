@@ -2,15 +2,29 @@
 
 A module for Ethereum connectivity.
 
-Parse ABI files, encode/decode ABI data, and make Ethereum [JSON-RPC](https://github.com/ethereum/wiki/wiki/JSON-RPC) calls.
+Parse ABI files, encode/decode ABI data, and make Ethereum [JSON-RPC](https://github.com/ethereum/wiki/wiki/JSON-RPC) calls: low-level calls, smart contract function calls and transactions.
+
+This is a work in progress but work seems to be progressing...
+
+Here are some [examples](example/julia/dumpContract.jl)
+
+# Simple use
+
+## Access a contract
+
+ctr = ContractContext("http://localhost:8545", "0x4ED124fcf412C28E4f36790a3A88056a5c44ade2", "abi.json")
+
+* ctr.myFunc.call(arg) -- call a function, returns the result as a Julia value(s)
+* ctr.myFunc.send(arg, arg) -- send a transaction, returns the result as a Julia value(s)
+
+# Structure
 
 ## Structs
 
 * Web3Connection(url): a JSON-RPC connection to an Ethereum node
 * Contract(functions, events): A contract's function and event declarations
-* FunctionCall(decl, inputs): A call to a function
-* FunctionResult(decl, outputs): The outputs of a function call
-* Event(decl, parameters): A logged event
+* ABIFunction(constant, hash, inputs, name, outputs, payable, signature, statemutability, argtypes)
+* ContractContext(connection, contract)
 
 ## Variables
 
