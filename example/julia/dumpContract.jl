@@ -1,6 +1,6 @@
 using Web3
 
-setverbose(true)
+#setverbose(true)
 
 dir = dirname(dirname(dirname(@__FILE__)))
 
@@ -33,7 +33,7 @@ println("Transactions: " * eth.gettransactioncount(connection, "0x4083eFF85F0C6a
 
 #println(context.numAccounts().send)
 
-println("num accounts: ", context.numAccounts.call())
+println("num accounts: ", context.numAccounts.call().little)
 #context.updateAccount.send(true, "d", "e", "f", from = "0x579CDD2D6404f033E70336BDE7a30CDf5c2c574c", gas = 200000)
 println("Account info for bubba: ", context.getAccount.call("d"))
 

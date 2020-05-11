@@ -79,7 +79,7 @@ Call a JSON-RPC method and return the result property of the JSON result
 #jsonget(url, method, params...) = rawjsonget(url, method, params...)["result"]
 function jsonget(url, method, params...)
     json = rawjsonget(url, method, params...)
-    println("JSON: ", repr(json))
+    if verbose println("JSON: ", repr(json)) end
     json["result"]
 end
 
@@ -94,9 +94,7 @@ function rawjsonget(url, method, params...)
         :method => method
         :params => params
     ]))
-    if verbose
-        println("\nREQUEST: $(req)\n")
-    end
+    if verbose println("\nREQUEST: $(req)\n") end
     resp = HTTP.request("POST", url, [], req)
     if resp.status == 200
         resultstr = String(resp.body)
@@ -260,6 +258,9 @@ function encodefunctioncall(io::IOBuffer, f::ABIFunction, inputs::Array)
 end
 
 function basicencodefunctioncall(io::IO, f::ABIFunction, inputs::Array)
+    if length(f.inputs) != length(inputs)
+        throw("Wrong number of inputs to $(f.name), expecting $(length(f.inputs)) but got $(length(inputs))")
+    end
     write(io, f.hash)
     encode(io, f.inputs, inputs)
 end
@@ -407,7 +408,7 @@ function readuint(io::IO)
     Int256(ntoh(big), ntoh(read(io, UInt128)))
 end
 
-readlength(io::IO) = (read(io, UInt128);read(io, UInt128))
+readlength(io::IO) = (read(io, UInt128);ntoh(read(io, UInt128)))
 
 """
     decodefunctioncall(io::IO, con::Contract)
@@ -471,9 +472,18 @@ decodehead(io::IO, decl::Decl{:dynamic, :bytes}) = readlength(io)
 decodetail(io::IO, decl::Decl{:dynamic, :bytes}, head) = readbytes(io, head)
 readbytes(io::IO, len) = read(io, len)
 
-decodehead(io::IO, decl::Decl{:dynamic, :string}) = readlength(io)
-decodetail(io::IO, decl::Decl{:dynamic, :string}, head) = readbytes(io, head)
-readstring(io::IO, len) = String(read(io, len))
+function decode(io::IO, decl::Decl{:string})
+    if verbose println("Reading string at $(position(io))") end
+    offset = readlength(io)
+    pos = position(io)
+    if verbose println("Offset: $(offset)") end
+    seek(io, offset)
+    count = readlength(io)
+    if verbose println("Length: $(count)") end
+    result = String(read(io, count))
+    seek(io, pos)
+    result
+end
 
 # array types
 function decode(io::IO, decl::Decl{:array, BASE, BITS, LENGTH}) where {BASE, BITS, LENGTH}
@@ -493,9 +503,16 @@ end
 
 # tuple
 decode(io::IO, decl::Decl{:tuple}) = decodetail(io, decl.components)
-decode(io::IO, decls::Array) = decodetail(io, decls, decodehead(io, decls))
-decodehead(io::IO, decls::Array) = [decodehead(io, head) for head in decls]
-decodetail(io::IO, decls::Array, heads) = [decodetail(io, decls[i], heads[i]) for i in 1:length(decls)]
+#decode(io::IO, decls::Array) = decodetail(io, decls, decodehead(io, decls))
+#decodehead(io::IO, decls::Array) = [decodehead(io, head) for head in decls]
+#decodetail(io::IO, decls::Array, heads) = [decodetail(io, decls[i], heads[i]) for i in 1:length(decls)]
+function decode(io::IO, decls::Array)
+    result = []
+    for decl in decls
+        push!(result, decode(io, decl))
+    end
+    result
+end
 
 ####################
 # DECL PARSING
@@ -673,11 +690,29 @@ end
 options are: gasprice, gas, value, nonce, chain, hardfork, common
 """
 function send(context::ContractContext, name, args; options...)
-    basicsend(:eth_sendTransaction, context, name, args; options...)
+    func = contract(context).functions[name]
+    extractresult(func, basicsend(:eth_sendTransaction, context, name, args; options...))
 end
 
 function call(context::ContractContext, name, args; options...)
-    basicsend(:eth_call, context, name, args; options...)
+    func = contract(context).functions[name]
+    extractresult(func, basicsend(:eth_call, context, name, args; options...))
+end
+
+function extractresult(func::ABIFunction, json::Dict)
+    if haskey(json, "result")
+        if verbose println("DECODING RESULT: ", json["result"]) end
+        result = decode(IOBuffer(hex2bytes(json["result"][3:end])), func.outputs)
+        if length(result) == 1
+            result[1]
+        else
+            (result...,)
+        end
+    elseif haskey(json, "error")
+        throw(json["error"])
+    else
+        throw("Unknown result: $(repr(json))")
+    end
 end
 
 function basicsend(op, context::ContractContext, name, args; options...)
@@ -688,6 +723,7 @@ function basicsend(op, context::ContractContext, name, args; options...)
         :id => 1
     ]),
                          pairs(options))
+    if verbose println(op, " $name DATA: ", transaction[:data]) end
     result = if op == :eth_sendTransaction
         rawjsonget(connection(context).url, op, transaction)
     else
@@ -695,9 +731,9 @@ function basicsend(op, context::ContractContext, name, args; options...)
     end
     if haskey(result, "error")
         err = result["error"]
-        println("ERROR: $(err["message"])\n$(err["data"]["stack"])")
+        if verbose println("ERROR: $(err["message"])\n$(err["data"]["stack"])") end
     end
-    println("JSON: $(repr(result))")
+    if verbose println(op, " $name RESULT JSON: $(repr(result))") end
     result
 end
 
