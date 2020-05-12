@@ -144,8 +144,8 @@ const eth = (
     getcode = apifunc(:eth_getCode, (addr, ctx)-> (addr, ctx)),
     getblockbyhash = apifunc(:eth_getBlockByHash, (hash, ctx)-> (hash, ctx)),
     getblockbynumber = apifunc(:eth_getBlockByNumber, (tag, ctx)-> (tag, ctx)),
-    getblocktransactioncountbyhash = apifunc(:eth_getBlockTransactionCountByHash, (hash)-> (hash)),
-    getblocktransactioncountbynumber = apifunc(:eth_getBlockTransactionCountByNumber, (tag)-> (tag)),
+    getblocktransactioncountbyhash = apifunc(:eth_getBlockTransactionCountByHash, (hash)-> (hash,)),
+    getblocktransactioncountbynumber = apifunc(:eth_getBlockTransactionCountByNumber, (tag)-> (tag,)),
     gettransactioncount = apifunc(:eth_getTransactionCount, (addr, ctx)-> (addr, ctx)),
     gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash,)),
     gettransactionreceipt = apifunc(:eth_getTransactionReceipt, (hash)-> (hash,)),
@@ -174,7 +174,9 @@ const shh = (
     newidentity = apifunc(:shh_newIdentity, ()-> ()),
 )
 
-const utils = (keccak = hash,)
+const utils = (
+    keccak = hash,
+)
 
 # This is a separate function so that test code can override it
 function hash(con::Web3Connection, str::String)
