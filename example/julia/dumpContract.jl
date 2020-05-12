@@ -40,6 +40,7 @@ println("blocknumber: " * eth.blocknumber(connection))
 # Frequently used RPC methods
 println("getbalance: " * eth.getbalance(connection, "0x79F379CebBD362c99Af2765d1fa541415aa78508", "latest"))
 println("Transactions: " * eth.gettransactioncount(connection, "0x4083eFF85F0C6a740c440E3419EbE6f7E1713447", "latest"))
+println("Latest block transaction count: " * eth.getblocktransactioncountbynumber(connection, "latest"))
 
 # txbyhash = eth.gettransactionbyhash(connection, "0x25b23c0d5edfa8433388bbb3e3ae2f76feed4495038fcbdf376b252c9ede18fd")
 # txreceipt = eth.gettransactionreceipt(connection, "0x73b3a1505d4d9cca70d3082d660e7e696f9abf6fc2d1b7c3a35a1699b779e1d4")
@@ -58,6 +59,6 @@ println("Wrappers...")
 
 println("num accounts: ", context.numAccounts.call().little)
 #context.updateAccount.send(true, "d", "e", "f", from = "0x579CDD2D6404f033E70336BDE7a30CDf5c2c574c", gas = 200000)
-println("Account info for bubba: ", context.getAccount.call("d"))
+#println("Account info for bubba: ", context.getAccount.call("d"))
 
 println("done")

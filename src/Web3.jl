@@ -43,7 +43,7 @@ export readABI, Web3Connection, Contract, contracts
 export FunctionCall, encodefunctioncall, decodefunctioncall
 export FunctionResult, encodefunctionresult, decodefunctionresult
 export Event, encodeevent, decodeevent
-export clientversion, eth, utils
+export clientversion, eth, utils, net
 export computetypes, ContractContext, contract, connection, functions
 export sha3_224, sha3_256, sha3_384, sha3_512
 export setverbose
