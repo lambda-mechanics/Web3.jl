@@ -118,10 +118,39 @@ apifunc(apimethod, func) = (con::Web3Connection, args...; raw=false)-> (raw ? ra
 
 function hash end
 
-const clientversion = apifunc(:web3_clientVersion, ()->[])
+const clientversion = apifunc(:web3_clientVersion, ()-> ())
+
+const net = (
+    version = apifunc(:net_version, ()-> ()),
+    peercount = apifunc(:net_peerCount, ()-> ()),
+    listening = apifunc(:net_listening, ()-> ()),
+)
+
 const eth = (
+    protocolversion = apifunc(:eth_protocolVersion, ()-> ()),
+    syncing = apifunc(:eth_syncing, ()-> ()),
+    mining = apifunc(:eth_mining, ()-> ()),
+    coinbase = apifunc(:eth_coinbase, ()-> ()),
+    hashrate = apifunc(:eth_hashrate, ()-> ()),
+    accounts = apifunc(:eth_accounts, ()-> ()),
+    gasprice = apifunc(:eth_gasPrice, ()-> ()),
+    blocknumber = apifunc(:eth_blockNumber, ()-> ()),
+    pendingtransactions = apifunc(:eth_pendingTransactions, ()-> ()),
+    newblockfilter = apifunc(:eth_newBlockFilter, ()-> ()),
+    newpendingtransactionfilter = apifunc(:eth_newPendingTransactionFilter, ()-> ()),
+    getwork = apifunc(:eth_getWork, ()-> ()),
+    getbalance = apifunc(:eth_getBalance, (addr, ctx)-> (addr, ctx)),
+    getstorageat = apifunc(:eth_getStorageAt, (addr, pos, ctx)-> (addr, pos, ctx)),
+    getcode = apifunc(:eth_getCode, (addr, ctx)-> (addr, ctx)),
+    getblockbyhash = apifunc(:eth_getBlockByHash, (hash, ctx)-> (hash, ctx)),
+    getblockbynumber = apifunc(:eth_getBlockByNumber, (tag, ctx)-> (tag, ctx)),
+    getblocktransactioncountbyhash = apifunc(:eth_getBlockTransactionCountByHash, (hash)-> (hash)),
+    getblocktransactioncountbynumber = apifunc(:eth_getBlockTransactionCountByNumber, (tag)-> (tag)),
     gettransactioncount = apifunc(:eth_getTransactionCount, (addr, ctx)-> (addr, ctx)),
-    gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash)),
+    gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash,)),
+    gettransactionreceipt = apifunc(:eth_getTransactionReceipt, (hash)-> (hash,)),
+    estimategas = apifunc(:eth_estimateGas, (dict)-> dict),
+    call = apifunc(:eth_call, (dict)-> dict),
     sendtransaction = apifunc(:eth_sendTransaction, (from, to, gas, gasprice, value, data, nonce)->
                               Dict([:from => from
                                     :to => to
@@ -129,7 +158,22 @@ const eth = (
                                     :gasprice => gasprice
                                     :value => value
                                     :data => data
-                                    :nonce => nonce])))
+                                    :nonce => nonce])),
+    getlogs = apifunc(:eth_getLogs, (dict)-> dict),
+)
+
+const db = (
+    putstring = apifunc(:db_putString, (db, key, value)-> (db, key, value,)),
+    getstring = apifunc(:db_getString, (db, key)-> (value,)),
+    puthex = apifunc(:db_putHex, (db, key, value)-> (db, key, value,)),
+    gethex = apifunc(:db_getHex, (db, key)-> (value,)),
+)
+
+const shh = (
+    version = apifunc(:shh_version, ()-> ()),
+    newidentity = apifunc(:shh_newIdentity, ()-> ()),
+)
+
 const utils = (keccak = hash,)
 
 # This is a separate function so that test code can override it
