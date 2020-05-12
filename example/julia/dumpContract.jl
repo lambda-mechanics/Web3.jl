@@ -22,12 +22,35 @@ for (name, func) in functions(context)
     end
 end
 
+println("Check Client...")
+println("clientversion: " * clientversion(connection))
+println("netversion: " * net.version(connection))
+println("protocolversion: " * eth.protocolversion(connection))
+println("gasprice: " * eth.gasprice(connection))
+println("blocknumber: " * eth.blocknumber(connection))
+
+# Local Clients
+# println("coinbase: " * eth.coinbase(connection))
+# println("hashrate: " * eth.hashrate(connection))
+# println("syncing: " * eth.syncing(connection))
+# println("mining: " * eth.mining(connection))
+# println("sha3: " * eth.sha3(connection))
+# println("getwork: " * eth.getwork(connection))
+
+# Frequently used RPC methods
+println("getbalance: " * eth.getbalance(connection, "0x79F379CebBD362c99Af2765d1fa541415aa78508", "latest"))
+println("Transactions: " * eth.gettransactioncount(connection, "0x4083eFF85F0C6a740c440E3419EbE6f7E1713447", "latest"))
+
+# txbyhash = eth.gettransactionbyhash(connection, "0x25b23c0d5edfa8433388bbb3e3ae2f76feed4495038fcbdf376b252c9ede18fd")
+# txreceipt = eth.gettransactionreceipt(connection, "0x73b3a1505d4d9cca70d3082d660e7e696f9abf6fc2d1b7c3a35a1699b779e1d4")
+# blockbyhash = eth.getblockbyhash(connection, "0x6e89e4ba74265a1ef762095428e7b954b40e2b2085b02e00f837a935f1a13119", true)
+# blockbynumber = eth.getblockbynumber(connection, "latest", true)
+# accounts = eth.accounts(connection)
+
 println("Wrappers...")
 #for p in map(pair-> pair[1] => pair[2], collect(contract(context).functions))
 #    println("($(typeof(p[1]))) $(p[1]) => $(repr(first(methods(p[2]))))")
 #end
-
-println("Transactions: " * eth.gettransactioncount(connection, "0x4083eFF85F0C6a740c440E3419EbE6f7E1713447", "latest"))
 
 #println(repr(context.numAccounts))
 
