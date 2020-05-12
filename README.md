@@ -12,8 +12,7 @@ Here are some [examples](example/julia/dumpContract.jl)
 
 ## Access a contract
 
-ctr = ContractContext("http://localhost:8545", "0x4ED124fcf412C28E4f36790a3A88056a5c44ade2", "abi.json")
-
+* ctr = ContractContext("http://localhost:8545", "0x4ED124fcf412C28E4f36790a3A88056a5c44ade2", "abi.json") -- create a contract context (a contract associated with a connection)
 * ctr.myFunc.call(arg) -- call a function, returns the result as a Julia value(s)
 * ctr.myFunc.send(arg, arg) -- send a transaction, returns the result as a Julia value(s)
 
