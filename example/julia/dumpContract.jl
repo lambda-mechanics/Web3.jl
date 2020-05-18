@@ -1,12 +1,13 @@
 using Web3
 
-#setverbose(true)
+setverbose(true)
 
 dir = dirname(dirname(dirname(@__FILE__)))
 
 contractid = "0x4ED124fcf412C28E4f36790a3A88056a5c44ade2"
 
-connection = Web3Connection("http://localhost:7545")
+#connection = Web3Connection("http://localhost:7545")
+connection = Web3Connection("https://mainnet.infura.io/v3/b048b4d49aad428babc12c0eb65dcdc9")
 
 abifile = reduce(joinpath, split("../contract/build/contracts/Accounts.json", "/")) # platform path
 
@@ -57,7 +58,7 @@ println("Wrappers...")
 
 #println(context.numAccounts().send)
 
-println("num accounts: ", context.numAccounts.call().little)
+#println("num accounts: ", context.numAccounts.call().little)
 #context.updateAccount.send(true, "d", "e", "f", from = "0x579CDD2D6404f033E70336BDE7a30CDf5c2c574c", gas = 200000)
 #println("Account info for bubba: ", context.getAccount.call("d"))
 

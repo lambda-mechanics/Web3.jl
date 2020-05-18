@@ -51,6 +51,9 @@ export setverbose
 
 include("keccak.jl")
 
+# note that msgId is not safe for multi-threaded access
+msgId = 1
+
 ####################
 # Web3
 ####################
@@ -80,7 +83,13 @@ Call a JSON-RPC method and return the result property of the JSON result
 function jsonget(url, method, params...)
     json = rawjsonget(url, method, params...)
     if verbose println("JSON: ", repr(json)) end
-    json["result"]
+    if haskey(json, "result")
+        json["result"]
+    elseif haskey(json, "error")
+        throw(ErrorException(json["error"]["message"]))
+    else
+        throw(ErrorException("Bad JSON response, no error or result: $(repr(json))"))
+    end
 end
 
 """
@@ -93,6 +102,7 @@ function rawjsonget(url, method, params...)
         :jsonrpc => "2.0"
         :method => method
         :params => params
+        :id => (global msgId += 1)
     ]))
     if verbose println("\nREQUEST: $(req)\n") end
     resp = HTTP.request("POST", url, [], req)
