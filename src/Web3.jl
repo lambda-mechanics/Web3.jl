@@ -43,7 +43,7 @@ export readABI, Web3Connection, Contract, contracts
 export FunctionCall, encodefunctioncall, decodefunctioncall
 export FunctionResult, encodefunctionresult, decodefunctionresult
 export Event, encodeevent, decodeevent
-export clientversion, eth, utils, net
+export clientversion, eth, utils, net, shh, db
 export computetypes, ContractContext, contract, connection, functions
 export sha3_224, sha3_256, sha3_384, sha3_512
 export setverbose
@@ -145,20 +145,22 @@ const eth = (
     accounts = apifunc(:eth_accounts, ()-> ()),
     gasprice = apifunc(:eth_gasPrice, ()-> ()),
     blocknumber = apifunc(:eth_blockNumber, ()-> ()),
-    pendingtransactions = apifunc(:eth_pendingTransactions, ()-> ()),
-    newblockfilter = apifunc(:eth_newBlockFilter, ()-> ()),
-    newpendingtransactionfilter = apifunc(:eth_newPendingTransactionFilter, ()-> ()),
-    getwork = apifunc(:eth_getWork, ()-> ()),
     getbalance = apifunc(:eth_getBalance, (addr, ctx)-> (addr, ctx)),
     getstorageat = apifunc(:eth_getStorageAt, (addr, pos, ctx)-> (addr, pos, ctx)),
     getcode = apifunc(:eth_getCode, (addr, ctx)-> (addr, ctx)),
-    getblockbyhash = apifunc(:eth_getBlockByHash, (hash, ctx)-> (hash, ctx)),
-    getblockbynumber = apifunc(:eth_getBlockByNumber, (tag, ctx)-> (tag, ctx)),
+    gettransactioncount = apifunc(:eth_getTransactionCount, (addr, ctx)-> (addr, ctx)),
     getblocktransactioncountbyhash = apifunc(:eth_getBlockTransactionCountByHash, (hash)-> (hash,)),
     getblocktransactioncountbynumber = apifunc(:eth_getBlockTransactionCountByNumber, (tag)-> (tag,)),
-    gettransactioncount = apifunc(:eth_getTransactionCount, (addr, ctx)-> (addr, ctx)),
+    getblockbyhash = apifunc(:eth_getBlockByHash, (hash, ctx)-> (hash, ctx)),
+    getblockbynumber = apifunc(:eth_getBlockByNumber, (tag, ctx)-> (tag, ctx)),
     gettransactionbyhash = apifunc(:eth_getTransactionByHash, (hash)-> (hash,)),
     gettransactionreceipt = apifunc(:eth_getTransactionReceipt, (hash)-> (hash,)),
+    gettransactionbyblockhashandindex = apifunc(:eth_getTransactionByBlockHashAndIndex, (hash, index)-> (hash, index)),
+    gettransactionbyblocknumberandindex = apifunc(:eth_getTransactionByBlockNumberAndIndex, (tag, index)-> (tag, index)),
+    getunclecountbyblockhash = apifunc(:eth_getUncleCountByBlockHash, (hash)-> (hash,)),
+    getunclecountbyblocknumber = apifunc(:eth_getUncleCountByBlockNumber, (tag)-> (tag,)),
+    getunclebyblockhashandindex = apifunc(:eth_getUncleByBlockHashAndIndex, (hash, index)-> (hash, index)),
+    getunclebyblocknumberandindex = apifunc(:eth_getUncleByBlockNumberAndIndex, (tag, index)-> (tag, index)),
     estimategas = apifunc(:eth_estimateGas, (dict)-> dict),
     call = apifunc(:eth_call, (dict)-> dict),
     sendtransaction = apifunc(:eth_sendTransaction, (from, to, gas, gasprice, value, data, nonce)->
@@ -169,7 +171,29 @@ const eth = (
                                     :value => value
                                     :data => data
                                     :nonce => nonce])),
-    getlogs = apifunc(:eth_getLogs, (dict)-> dict),
+    sign = apifunc(:eth_sign, (address, data)-> (address, data)),
+    sendrawtransaction = apifunc(:eth_sendRawTransaction, (data)-> (data,)),
+    pendingtransactions = apifunc(:eth_pendingTransactions, ()-> ()),
+    newfilter = apifunc(:eth_newFilter, (fromBlock, toBlock, address, topics)->
+                              Dict([:fromBlock => fromBlock
+                                    :toBlock => toBlock
+                                    :address => address
+                                    :topics => topics])),
+    newblockfilter = apifunc(:eth_newBlockFilter, ()-> ()),
+    newpendingtransactionfilter = apifunc(:eth_newPendingTransactionFilter, ()-> ()),
+    uninstallfilter = apifunc(:eth_uninstallFilter, (filterid)-> (filterid,)),
+    getfilterchanges = apifunc(:eth_getFilterChanges, (filterid)-> (filterid,)),
+    getfilterlogs = apifunc(:eth_getFilterLogs, (filterid)-> (filterid,)),
+    getlogs = apifunc(:eth_getLogs, (fromBlock, toBlock, address, topics, blockhash)->
+                              Dict([:fromBlock => fromBlock
+                                    :toBlock => toBlock
+                                    :address => address
+                                    :topics => topics
+                                    :blockhash => blockhash])),
+    getwork = apifunc(:eth_getWork, ()-> ()),
+    submitwork = apifunc(:eth_submitWork, (nonce, powhash, mixdigest)-> (nonce, powhash, mixdigest)),
+    submithashrate = apifunc(:eth_submitHashrate, (hashrate, id)-> (hashrate, id)),
+    getproof = apifunc(:eth_getProof, (address, keys, blocktag)-> (address, keys, blocktag)),
 )
 
 const db = (
@@ -181,7 +205,23 @@ const db = (
 
 const shh = (
     version = apifunc(:shh_version, ()-> ()),
+    post = apifunc(:shh_post, (from, to, topics, payload, priority, ttl)->
+                              Dict([:from => from
+                                    :to => to
+                                    :topics => topics
+                                    :payload => payload
+                                    :priority => priority
+                                    :ttl => ttl])),
     newidentity = apifunc(:shh_newIdentity, ()-> ()),
+    hasidentity = apifunc(:shh_hasIdentity, (identity)-> (identity,)),
+    newgroup = apifunc(:shh_newGroup, ()-> ()),
+    addtogroup = apifunc(:shh_addToGroup, (identity)-> (identity,)),
+    newfilter = apifunc(:shh_newFilter, (to, topics)->
+                              Dict([:to => to
+                                    :topics => topics])),
+    uninstallfilter = apifunc(:shh_uninstallFilter, (filterid)-> (filterid,)),
+    getfilterchanges = apifunc(:shh_getFilterChanges, (filterid)-> (filterid,)),
+    getmessages = apifunc(:shh_getMessages, (filterid)-> (filterid,)),
 )
 
 const utils = (
