@@ -105,7 +105,8 @@ function rawjsonget(url, method, params...)
         :id => (global msgId += 1)
     ]))
     if verbose println("\nREQUEST: $(req)\n") end
-    resp = HTTP.request("POST", url, [], req)
+    headers = ["Content-Type" => "application/json"]
+    resp = HTTP.request("POST", url, headers, req)
     if resp.status == 200
         resultstr = String(resp.body)
         result = JSON.parse(resultstr)
@@ -642,6 +643,10 @@ function parseABI(connection::Web3Connection, ::FunctionABI, func)
     args = join((arg-> arg["type"]).(func["inputs"]), ",")
     sig = "$name($args)"
     inputs = parseargs(func["inputs"])
+    if length(func["inputs"]) === 0
+        inputs = Decl[]
+    end
+
     ABIFunction(
         func["constant"],
         utils.keccak(connection, sig)[1:4],
@@ -685,7 +690,9 @@ function readABI(connection::Web3Connection, contractname::String, stream::IO)
     contract = Contract(contractname)
     d = JSON.parse(stream)
     close(stream)
-    for json in (haskey(d, "abi") ? d["abi"] : d)
+    d = ((isa(d, Dict) && haskey(d, "abi")) ? d["abi"] : d)
+    for json in d
+        json = Dict(json)
         obj = parseABI(connection, json)
         if isa(obj, ABIFunction)
             contract.functions[obj.name] = contract.functions[obj.hash] = obj
