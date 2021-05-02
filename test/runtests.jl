@@ -1,5 +1,6 @@
 using Test, Web3
 
+connection = Web3Connection("https://localhost:8545")
 abi = """[{"constant":false,"inputs":[{"name":"i","type":"int32"}],"name":"add","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"}]"""
 
 Web3.hash(hashes::Dict, str::String) = hashes[str]
@@ -28,7 +29,7 @@ txn = Dict{String,Any}(
 )
 
 # install contract
-@test readABI(hashes, contract, IOBuffer(abi)) != nothing
+@test readABI(connection, contract, IOBuffer(abi)) != nothing
 
 # test basic function call
 decoded = decodefunctioncall(IOBuffer(hex2bytes(txn["input"][3:end])), contracts[txn["to"]])
