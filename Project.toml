@@ -6,9 +6,4 @@ version = "0.2.4"
 [deps]
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[compat]
-HTTP = "0.9.7"
-JSON = "0.21.0"
-julia = "1.6.1"
+UpdateJulia = "770da0de-323d-4d28-9202-0e205c1e0aff"
