@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "92b950846f3fe4e29eb83380fc0960b784070e6b"
+project_hash = "2fb6c2b8fb303acc9da988cafd5862b39438b03e"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -150,6 +150,12 @@ version = "1.1.0"
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 
+[[deps.Suppressor]]
+deps = ["Logging"]
+git-tree-sha1 = "37d1976ca8368f6adbe1d65a4deeeda6ee7faa31"
+uuid = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
+version = "0.2.4"
+
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
@@ -176,6 +182,12 @@ uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+
+[[deps.UpdateJulia]]
+deps = ["JSON", "Suppressor"]
+git-tree-sha1 = "acb98be84aeb1553fd3e8335e2d58a960bd0a47e"
+uuid = "770da0de-323d-4d28-9202-0e205c1e0aff"
+version = "0.4.2"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
