@@ -492,8 +492,8 @@ end
 # DECODING
 ############
 
-const signedTypes = Dict([sizeof(t) => t for t in (Int8, Int16, Int32, Int64, Int128)])
-const unsignedTypes = Dict([sizeof(t) => t for t in (UInt8, UInt16, UInt32, UInt64, UInt128)])
+const signedTypes = Dict(sizeof(t) => t for t in (Int8, Int16, Int32, Int64, Int128))
+const unsignedTypes = Dict(sizeof(t) => t for t in (UInt8, UInt16, UInt32, UInt64, UInt128))
 
 function readint(io::IO)
     big = read(io, Int128)
@@ -669,7 +669,7 @@ end
 
 computetype(decl::Decl{T, :int, SIZE}) where {T, SIZE} = soliditytojulia["int$SIZE"]
 computetype(decl::Decl{T, :uint, SIZE}) where {T, SIZE} = soliditytojulia["uint$SIZE"]
-computetype(decl::Decl{:tuple, SIZE}) where {T, SIZE} = "tuple[$SIZE]"
+computetype(decl::Decl{:tuple, SIZE}) where {SIZE} = "tuple[$SIZE]"
 computetype(decl::Decl{:array, BASE, BITS, LENGTH}) where {BASE, BITS, LENGTH} = "array[LENGTH] of $BASE"
 computetype(decl::Decl{T, :bool} where {T}) = Bool
 computetype(decl::Decl{:string}) = String
